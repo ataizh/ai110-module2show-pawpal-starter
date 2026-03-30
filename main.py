@@ -46,6 +46,19 @@ print("\n--- All Appointments Sorted by Time ---")
 for patient_name, appt in caretaker.sort_by_time():
     print(f"  {patient_name}: {appt}")
 
+# Sort by priority
+print("\n--- All Appointments Sorted by Priority ---")
+for patient_name, appt in caretaker.sort_by_priority():
+    print(f"  {patient_name}: {appt}")
+
+# What fits in 60 minutes today
+print("\n--- What Fits in 60 Minutes Today ---")
+for patient_name, appt in caretaker.what_fits(60, today):
+    print(f"  {patient_name}: {appt}")
+
+# Explain the plan
+print("\n" + caretaker.explain_plan(60, today))
+
 # Recurring task — mark complete and get next occurrence
 print("\n--- Recurring Task Demo ---")
 morning_feeding = mochi.appointments[0]

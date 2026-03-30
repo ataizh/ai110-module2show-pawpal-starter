@@ -160,6 +160,65 @@ class Caretaker:
             if appt.priority == priority
         ]
 
+    def sort_by_priority(self) -> list:
+        """Return all appointments sorted high → medium → low priority."""
+        rank = {"high": 0, "medium": 1, "low": 2}
+        return sorted(
+            self.person.get_appointments(),
+            key=lambda x: (rank.get(x[1].priority, 99), x[1].date, x[1].time),
+        )
+
+    def what_fits(self, time_budget_minutes: int, target_date: str = None) -> list:
+        """Return appointments that fit within a time budget, picking high priority first."""
+        if target_date is None:
+            target_date = date.today().strftime("%Y-%m-%d")
+        rank = {"high": 0, "medium": 1, "low": 2}
+        candidates = sorted(
+            [(name, appt) for name, appt in self.person.get_appointments()
+             if appt.date == target_date],
+            key=lambda x: (rank.get(x[1].priority, 99), x[1].time),
+        )
+        chosen, total = [], 0
+        for name, appt in candidates:
+            if total + appt.duration_minutes <= time_budget_minutes:
+                chosen.append((name, appt))
+                total += appt.duration_minutes
+        return chosen
+
+    def explain_plan(self, time_budget_minutes: int, target_date: str = None) -> str:
+        """Return a plain-English explanation of what was scheduled and why."""
+        if target_date is None:
+            target_date = date.today().strftime("%Y-%m-%d")
+        rank = {"high": 0, "medium": 1, "low": 2}
+        all_day = sorted(
+            [(name, appt) for name, appt in self.person.get_appointments()
+             if appt.date == target_date],
+            key=lambda x: (rank.get(x[1].priority, 99), x[1].time),
+        )
+        lines = [f"Plan explanation for {target_date} (budget: {time_budget_minutes} min)\n"]
+        total = 0
+        for name, appt in all_day:
+            if total + appt.duration_minutes <= time_budget_minutes:
+                total += appt.duration_minutes
+                lines.append(
+                    f"  INCLUDED  '{appt.title}' for {name} at {appt.time} "
+                    f"({appt.duration_minutes} min, {appt.priority} priority) "
+                    f"— {total}/{time_budget_minutes} min used."
+                )
+            else:
+                lines.append(
+                    f"  SKIPPED   '{appt.title}' for {name} "
+                    f"({appt.duration_minutes} min) — not enough time remaining "
+                    f"({time_budget_minutes - total} min left)."
+                )
+        conflicts = self.find_conflicts()
+        day_conflicts = [(a1, a2) for a1, a2 in conflicts if a1[1].date == target_date]
+        if day_conflicts:
+            lines.append("\n  Conflicts to resolve:")
+            for (n1, a1), (n2, a2) in day_conflicts:
+                lines.append(f"    '{a1.title}' ({n1}) and '{a2.title}' ({n2}) clash at {a1.time}.")
+        return "\n".join(lines)
+
     def summarize_day(self, target_date: str = None) -> str:
         """Print a readable summary of the day's appointments."""
         if target_date is None:

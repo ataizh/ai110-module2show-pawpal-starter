@@ -32,8 +32,9 @@ The system uses four classes modeled after human healthcare and daily life roles
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+The `what_fits()` and `explain_plan()` methods use a greedy algorithm — they pick appointments in priority order and include each one if it fits in the remaining time budget, never going back to reconsider earlier choices. This means a 60-minute budget might include three small high-priority tasks and skip a large medium-priority one, even if swapping one small task would allow the medium one to fit.
+
+This tradeoff is reasonable for a daily pet care scenario because: (1) high-priority tasks like medications genuinely must come first, (2) the greedy approach is fast and easy to explain to a non-technical pet owner, and (3) the `explain_plan()` output tells the owner exactly what was skipped and why, so they can manually adjust if needed. A full knapsack optimization would be more "correct" but far harder to reason about.
 
 ---
 
