@@ -2,10 +2,19 @@
 
 ## 1. System Design
 
+### Core User Actions
+1. **Add a pet** — the owner enters basic info (their name, pet name, species) to register a pet in the system.
+2. **Schedule tasks** — the owner adds care tasks (walks, feedings, meds, grooming) with a duration and priority level.
+3. **Generate a daily plan** — the system produces a sorted, prioritized schedule for the day and explains why each task was chosen and when it happens.
+
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+The system uses four classes modeled after human healthcare and daily life roles:
+
+- **Person** — the pet owner. Holds personal info (name, phone, email) and a list of patients. Responsible for registering new patients and retrieving all their appointments.
+- **Patient** — the pet, treated like a care patient. Stores health info (species, age, medical notes) and owns a list of appointments. Can return upcoming or past appointments.
+- **Appointment** — a single care event (walk, feeding, vet visit). Has a date, time, duration, priority, and repeat frequency. Can be confirmed, cancelled, rescheduled, or auto-generate its next occurrence.
+- **Caretaker** — the scheduling brain. Wraps a Person and provides planning logic: sorting by time, filtering by priority, detecting time conflicts, and summarizing the day.
 
 **b. Design changes**
 
