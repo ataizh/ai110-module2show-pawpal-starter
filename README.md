@@ -1,16 +1,16 @@
 # PawPal+ 🐾
 
-A smart daily pet care planner built with Python and Streamlit. PawPal+ helps pet owners organize, prioritize, and schedule care tasks for their pets — and explains the reasoning behind every plan.
+A pet care planner built with Python and Streamlit. You add your pets, schedule their care tasks, and the app figures out what actually fits in your day — and tells you why it skipped anything it couldn't fit.
 
 ---
 
 ## Scenario
 
-A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
+A busy pet owner wants to stay on top of their pet's care without having to mentally juggle everything. They need something that can:
 
-- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
-- Consider constraints (time available, priority, owner preferences)
-- Produce a daily plan and explain why it chose that plan
+- Keep track of care tasks like walks, feeding, meds, grooming, vet visits
+- Work around how much time they actually have that day
+- Give them a realistic plan, not just a list of everything
 
 ---
 
@@ -33,11 +33,11 @@ A busy pet owner needs help staying consistent with pet care. They want an assis
 - **Task type emojis** *(Challenge 4)* — 🦮 walks, 🍽️ feedings, 💊 medications, 🏥 vet visits, 🎾 play, and more, automatically assigned from the appointment title
 
 ### How Agent Mode Was Used (Challenge 1)
-The `find_next_slot()` algorithm was designed using Agent Mode. The prompt given was:
+I used Agent Mode to build `find_next_slot()`. My prompt was something like:
 
-> "In `pawpal_system.py`, add a `find_next_slot(duration_minutes, target_date, start_hour)` method to `Caretaker` that scans the day in 15-minute increments and returns the first available time window that fits a task of the given duration without overlapping any existing appointment. Use proper overlap detection — not just start-time matching."
+> "Add a `find_next_slot(duration_minutes, target_date, start_hour)` method to Caretaker that scans the day in 15-minute increments and finds the first open time slot for a task of that length, without overlapping anything already booked."
 
-Agent Mode identified that start-time-only matching (the naive approach) would miss cases where a new task starts *during* an existing one. It suggested interval overlap logic: two intervals `[s1, e1]` and `[s2, e2]` overlap when `s1 < e2 and s2 < e1`. This was incorporated directly into the implementation.
+The first version it came back with only checked if start times matched, which would've missed cases where a new appointment starts in the middle of an existing one. I pointed that out and it rewrote it with proper interval overlap logic — if two intervals `[s1, e1]` and `[s2, e2]` overlap when `s1 < e2 and s2 < e1`. That version actually works correctly so I kept it.
 
 ---
 
@@ -95,7 +95,7 @@ The test suite covers 22 behaviors across 7 categories:
 | what_fits | budget cap, priority preference, zero budget |
 | explain_plan | INCLUDED/SKIPPED labels, conflict mentions |
 
-**Confidence level: ★★★★☆** — core logic thoroughly tested; edge cases like overlapping durations would be next.
+**Confidence: ★★★★☆** — everything core works. The one thing I'd add tests for next is overlapping durations (e.g. a 30-min task at 7:00 and a 20-min task at 7:15 — those overlap but the conflict detector doesn't catch them yet).
 
 ---
 
