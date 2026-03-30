@@ -101,7 +101,7 @@ The test suite covers 22 behaviors across 7 categories:
 
 ## 📸 Demo
 
-_Add a screenshot of your running app here._
+![PawPal+ App](Screenshot%202026-03-29%20214736.jpg.png)
 
 ---
 
