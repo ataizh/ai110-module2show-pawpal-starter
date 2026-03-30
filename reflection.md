@@ -56,13 +56,20 @@ This tradeoff is reasonable for a daily pet care scenario because: (1) high-prio
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+22 automated tests covering:
+- **Appointment lifecycle** — confirm, cancel, reschedule
+- **Recurrence** — daily (+1 day), weekly (+7 days), none (returns None)
+- **Patient management** — booking increases count, history vs upcoming separation
+- **Caretaker sorting** — by time (chronological), by priority (high → medium → low)
+- **Conflict detection** — same date/time flagged, different times pass cleanly
+- **what_fits** — never exceeds budget, prefers high priority, returns empty on 0-budget
+- **explain_plan** — contains INCLUDED/SKIPPED labels and flags conflicts
+
+These tests matter because scheduling bugs are silent — a task silently skipped or a conflict ignored won't crash the app but will confuse the user.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+★★★★☆ (4/5) — Core scheduling logic is thoroughly tested. Edge cases to explore next: overlapping duration windows (two 30-min tasks at 07:00 and 07:15), patients with zero appointments, and budget exactly equal to total duration.
 
 ---
 

@@ -132,3 +132,84 @@ def test_plan_day_returns_correct_date(caretaker):
     """plan_day returns only appointments for the specified date."""
     day = caretaker.plan_day("2026-03-29")
     assert all(a.date == "2026-03-29" for _, a in day)
+
+
+# --- Sort by Priority Tests ---
+
+def test_sort_by_priority_order(caretaker, sample_owner):
+    """Appointments are returned high → medium → low priority."""
+    sample_owner.patients[0].book_appointment(
+        Appointment("Low Task",    "2026-03-29", "09:00", 10, "low")
+    )
+    sample_owner.patients[0].book_appointment(
+        Appointment("Medium Task", "2026-03-29", "10:00", 10, "medium")
+    )
+    sorted_appts = caretaker.sort_by_priority()
+    priorities = [a.priority for _, a in sorted_appts]
+    rank = {"high": 0, "medium": 1, "low": 2}
+    assert priorities == sorted(priorities, key=lambda p: rank[p])
+
+def test_sort_by_priority_all_same(caretaker, sample_owner):
+    """Appointments with the same priority are sorted by time."""
+    sample_owner.patients[0].book_appointment(
+        Appointment("Late High",  "2026-03-29", "20:00", 10, "high")
+    )
+    sample_owner.patients[0].book_appointment(
+        Appointment("Early High", "2026-03-29", "05:00", 10, "high")
+    )
+    high_only = [(n, a) for n, a in caretaker.sort_by_priority() if a.priority == "high"]
+    times = [a.time for _, a in high_only]
+    assert times == sorted(times)
+
+
+# --- what_fits Tests ---
+
+def test_what_fits_respects_budget(caretaker, sample_owner):
+    """what_fits never exceeds the given time budget."""
+    sample_owner.patients[0].book_appointment(
+        Appointment("Long Task", "2026-03-29", "12:00", 120, "low")
+    )
+    fits = caretaker.what_fits(30, "2026-03-29")
+    total = sum(a.duration_minutes for _, a in fits)
+    assert total <= 30
+
+def test_what_fits_prefers_high_priority(caretaker, sample_owner):
+    """what_fits includes high priority tasks before low priority ones."""
+    sample_owner.patients[0].book_appointment(
+        Appointment("Low Task",  "2026-03-29", "08:00", 25, "low")
+    )
+    sample_owner.patients[0].book_appointment(
+        Appointment("High Task", "2026-03-29", "09:00", 25, "high")
+    )
+    fits = caretaker.what_fits(30, "2026-03-29")
+    priorities = [a.priority for _, a in fits]
+    assert "high" in priorities
+
+def test_what_fits_empty_when_no_budget(caretaker):
+    """what_fits returns nothing when budget is 0."""
+    fits = caretaker.what_fits(0, "2026-03-29")
+    assert fits == []
+
+
+# --- explain_plan Tests ---
+
+def test_explain_plan_includes_included_label(caretaker):
+    """explain_plan output contains INCLUDED for tasks that fit."""
+    explanation = caretaker.explain_plan(60, "2026-03-29")
+    assert "INCLUDED" in explanation
+
+def test_explain_plan_includes_skipped_label(caretaker, sample_owner):
+    """explain_plan output contains SKIPPED when a task exceeds remaining budget."""
+    sample_owner.patients[0].book_appointment(
+        Appointment("Huge Task", "2026-03-29", "10:00", 999, "low")
+    )
+    explanation = caretaker.explain_plan(20, "2026-03-29")
+    assert "SKIPPED" in explanation
+
+def test_explain_plan_mentions_conflicts(caretaker, sample_owner):
+    """explain_plan flags conflicts when two tasks share a date and time."""
+    sample_owner.patients[0].book_appointment(
+        Appointment("Clash Task", "2026-03-29", "07:00", 5, "medium")
+    )
+    explanation = caretaker.explain_plan(120, "2026-03-29")
+    assert "clash" in explanation.lower() or "conflict" in explanation.lower()
