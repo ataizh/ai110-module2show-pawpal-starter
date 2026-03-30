@@ -1,17 +1,42 @@
+import json
+import os
 import streamlit as st
 from datetime import date
 from pawpal_system import Person, Patient, Appointment, Caretaker
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
-st.title("🐾 PawPal+")
-st.caption("A smart pet care planner for busy pet parents.")
+DATA_FILE = "data.json"
+
+# --- Helpers ---
+
+def save_data():
+    """Challenge 2: Persist owner data to data.json."""
+    if st.session_state.owner:
+        st.session_state.owner.save_to_json(DATA_FILE)
+
+def load_data():
+    """Challenge 2: Load owner data from data.json if it exists."""
+    if os.path.exists(DATA_FILE):
+        try:
+            owner = Person.load_from_json(DATA_FILE)
+            st.session_state.owner = owner
+            st.session_state.caretaker = Caretaker(owner)
+        except (json.JSONDecodeError, KeyError):
+            pass  # corrupt file — start fresh
 
 # --- Session State Setup ---
 if "owner" not in st.session_state:
     st.session_state.owner = None
 if "caretaker" not in st.session_state:
     st.session_state.caretaker = None
+if "data_loaded" not in st.session_state:
+    load_data()
+    st.session_state.data_loaded = True
+
+# --- Header ---
+st.title("🐾 PawPal+")
+st.caption("A smart pet care planner for busy pet parents.")
 
 # --- Step 1: Owner Setup ---
 st.header("1. Who are you?")
@@ -19,33 +44,40 @@ st.header("1. Who are you?")
 with st.form("owner_form"):
     col1, col2 = st.columns(2)
     with col1:
-        first_name = st.text_input("First name", value="Jordan")
+        first_name = st.text_input("First name",
+            value=st.session_state.owner.first_name if st.session_state.owner else "Jordan")
     with col2:
-        last_name = st.text_input("Last name", value="Lee")
-    phone = st.text_input("Phone (optional)", value="")
-    email = st.text_input("Email (optional)", value="")
+        last_name = st.text_input("Last name",
+            value=st.session_state.owner.last_name if st.session_state.owner else "Lee")
+    phone = st.text_input("Phone (optional)",
+        value=st.session_state.owner.phone if st.session_state.owner else "")
+    email = st.text_input("Email (optional)",
+        value=st.session_state.owner.email if st.session_state.owner else "")
     submitted = st.form_submit_button("Save Owner")
 
 if submitted:
-    st.session_state.owner = Person(
-        first_name=first_name,
-        last_name=last_name,
-        phone=phone,
-        email=email,
-    )
-    st.session_state.caretaker = Caretaker(st.session_state.owner)
-    st.success(f"Welcome, {st.session_state.owner.full_name}!")
+    if st.session_state.owner is None:
+        st.session_state.owner = Person(first_name=first_name, last_name=last_name,
+                                         phone=phone, email=email)
+        st.session_state.caretaker = Caretaker(st.session_state.owner)
+    else:
+        st.session_state.owner.first_name = first_name
+        st.session_state.owner.last_name  = last_name
+        st.session_state.owner.phone      = phone
+        st.session_state.owner.email      = email
+    save_data()
+    st.success(f"Welcome, {st.session_state.owner.full_name}! Data saved. 💾")
 
 if st.session_state.owner is None:
     st.info("Fill in your name above to get started.")
     st.stop()
 
-owner: Person = st.session_state.owner
+owner: Person     = st.session_state.owner
 caretaker: Caretaker = st.session_state.caretaker
 
 st.divider()
 
-# --- Step 2: Add a Patient (Pet) ---
+# --- Step 2: Register a Pet ---
 st.header("2. Register a Pet")
 
 with st.form("patient_form"):
@@ -64,13 +96,10 @@ if add_pet:
     if pet_name in existing_names:
         st.warning(f"{pet_name} is already registered.")
     else:
-        owner.register_patient(Patient(
-            name=pet_name,
-            species=species,
-            age=age,
-            medical_notes=medical_notes,
-        ))
-        st.success(f"{pet_name} the {species} has been registered!")
+        owner.register_patient(Patient(name=pet_name, species=species,
+                                       age=age, medical_notes=medical_notes))
+        save_data()
+        st.success(f"{pet_name} the {species} has been registered and saved! 💾")
 
 if owner.patients:
     st.write("**Registered pets:**", ", ".join(str(p) for p in owner.patients))
@@ -85,8 +114,8 @@ if not owner.patients:
 else:
     with st.form("appointment_form"):
         patient_name = st.selectbox("Pet", [p.name for p in owner.patients])
-        title = st.text_input("Appointment title", value="Morning Walk")
-        col1, col2 = st.columns(2)
+        title        = st.text_input("Appointment title", value="Morning Walk")
+        col1, col2   = st.columns(2)
         with col1:
             appt_date = st.date_input("Date", value=date.today())
         with col2:
@@ -110,7 +139,28 @@ else:
             priority=priority,
             repeat=repeat,
         ))
-        st.success(f"Booked '{title}' for {patient_name} at {appt_time.strftime('%H:%M')}!")
+        save_data()
+        st.success(f"Booked '{title}' for {patient_name} at {appt_time.strftime('%H:%M')}! 💾")
+
+    # Challenge 1: Next Available Slot finder
+    st.markdown("#### 🔍 Find Next Available Slot")
+    col_dur, col_dt, col_btn = st.columns([2, 2, 1])
+    with col_dur:
+        slot_duration = st.number_input("Task duration (min)", min_value=5, max_value=300,
+                                         value=30, key="slot_dur")
+    with col_dt:
+        slot_date = st.date_input("On date", value=date.today(), key="slot_date")
+    with col_btn:
+        st.write("")
+        st.write("")
+        find_slot = st.button("Find Slot")
+
+    if find_slot:
+        slot = caretaker.find_next_slot(int(slot_duration), slot_date.strftime("%Y-%m-%d"))
+        if slot:
+            st.success(f"✅ Next available {slot_duration}-min slot on {slot_date}: **{slot}**")
+        else:
+            st.error("No available slot found for that day.")
 
 st.divider()
 
@@ -125,8 +175,8 @@ with col_sort:
     sort_mode = st.radio("Sort by", ["Time", "Priority"], horizontal=True)
 with col_budget:
     use_budget = st.checkbox("Apply time budget")
-    time_budget = st.number_input("Available minutes", min_value=1, max_value=1440, value=120,
-                                   disabled=not use_budget)
+    time_budget = st.number_input("Available minutes", min_value=1, max_value=1440,
+                                   value=120, disabled=not use_budget)
 
 if st.button("Generate Schedule"):
     if use_budget:
@@ -141,14 +191,16 @@ if st.button("Generate Schedule"):
     if not day:
         st.info(f"No appointments scheduled for {date_str}.")
     else:
+        # Challenge 3 & 4: color-coded, emoji-rich table
         rows = []
         for patient_name, appt in day:
             rows.append({
+                "":         appt.emoji,
                 "Time":     appt.time,
                 "Pet":      patient_name,
                 "Task":     appt.title,
                 "Duration": f"{appt.duration_minutes} min",
-                "Priority": appt.priority,
+                "Priority": f"{appt.priority_emoji} {appt.priority}",
                 "Repeat":   appt.repeat,
                 "Status":   "✅ Done" if appt.attended else "⏳ Pending",
             })
@@ -160,15 +212,14 @@ if st.button("Generate Schedule"):
         if day_conflicts:
             for (n1, a1), (n2, a2) in day_conflicts:
                 st.warning(
-                    f"⚠️ Conflict: **{n1}** '{a1.title}' and **{n2}** '{a2.title}' "
-                    f"are both scheduled at **{a1.time}**. Consider rescheduling one."
+                    f"⚠️ **Conflict:** **{n1}** '{a1.title}' and **{n2}** '{a2.title}' "
+                    f"are both at **{a1.time}**. Consider rescheduling one."
                 )
         else:
-            st.success("✅ No conflicts detected for this day!")
+            st.success("✅ No scheduling conflicts detected!")
 
-    # Explain plan
     if use_budget:
-        with st.expander("Why was my schedule built this way?"):
+        with st.expander("💡 Why was my schedule built this way?"):
             explanation = caretaker.explain_plan(int(time_budget), date_str)
             st.code(explanation, language=None)
 
@@ -178,7 +229,7 @@ st.divider()
 st.header("5. Mark Appointments as Done")
 
 all_appts = owner.get_appointments()
-pending = [(name, appt) for name, appt in all_appts if not appt.attended]
+pending   = [(name, appt) for name, appt in all_appts if not appt.attended]
 
 if not pending:
     st.info("No pending appointments.")
@@ -186,10 +237,12 @@ else:
     for i, (patient_name, appt) in enumerate(pending):
         col1, col2 = st.columns([4, 1])
         with col1:
-            priority_color = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(appt.priority, "⚪")
-            st.write(f"{priority_color} **{patient_name}** — {appt.title} on {appt.date} at {appt.time} ({appt.duration_minutes} min)")
+            st.write(
+                f"{appt.emoji} {appt.priority_emoji} **{patient_name}** — "
+                f"{appt.title} on {appt.date} at {appt.time} ({appt.duration_minutes} min)"
+            )
         with col2:
-            if st.button("Done", key=f"done_{i}"):
+            if st.button("Done ✅", key=f"done_{i}"):
                 appt.confirm()
                 next_appt = appt.next_occurrence()
                 if next_appt:
@@ -198,4 +251,5 @@ else:
                     st.success(f"Done! Next '{appt.title}' booked for {next_appt.date}.")
                 else:
                     st.success(f"'{appt.title}' marked as done.")
+                save_data()
                 st.rerun()

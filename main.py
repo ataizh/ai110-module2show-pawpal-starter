@@ -3,6 +3,10 @@ PawPal+ Demo Script
 Run this to verify the backend logic works before connecting to the UI.
 """
 
+import sys
+sys.stdout.reconfigure(encoding="utf-8")
+
+from tabulate import tabulate
 from pawpal_system import Person, Patient, Appointment, Caretaker
 
 # --- Setup ---
@@ -17,50 +21,74 @@ owner.register_patient(rex)
 # --- Add Appointments ---
 today = "2026-03-29"
 
-# Mochi's appointments
 mochi.book_appointment(Appointment("Morning Feeding",    today, "07:00", 10,  "high",   "daily"))
 mochi.book_appointment(Appointment("Vet Checkup",        today, "14:00", 60,  "high",   "none"))
 mochi.book_appointment(Appointment("Playtime",           today, "18:00", 20,  "low",    "daily"))
 
-# Rex's appointments
 rex.book_appointment(Appointment("Morning Walk",         today, "07:30", 30,  "high",   "daily"))
 rex.book_appointment(Appointment("Joint Supplement",     today, "08:00", 5,   "high",   "daily"))
 rex.book_appointment(Appointment("Evening Walk",         today, "18:00", 30,  "medium", "daily"))
-
-# Conflict test — same time as Mochi's Morning Feeding
 rex.book_appointment(Appointment("Early Feeding",        today, "07:00", 10,  "medium", "daily"))
 
-# --- Run the Caretaker ---
 caretaker = Caretaker(owner)
 
-# Today's schedule
-print(caretaker.summarize_day(today))
+# --- Challenge 4: tabulate formatted schedule ---
+print("\n=== Today's Schedule ===")
+day = caretaker.plan_day(today)
+table_data = [
+    [appt.emoji, appt.time, pet, appt.title,
+     f"{appt.duration_minutes} min",
+     f"{appt.priority_emoji} {appt.priority}",
+     appt.repeat,
+     "Done" if appt.attended else "Pending"]
+    for pet, appt in day
+]
+print(tabulate(table_data,
+               headers=["", "Time", "Pet", "Task", "Duration", "Priority", "Repeat", "Status"],
+               tablefmt="rounded_outline"))
 
-# Filtering by priority
-print("\n--- High Priority Appointments ---")
-for patient_name, appt in caretaker.filter_by_priority("high"):
-    print(f"  {patient_name}: {appt}")
+# --- Conflicts ---
+print("\n=== Conflict Check ===")
+conflicts = caretaker.find_conflicts()
+if conflicts:
+    for (n1, a1), (n2, a2) in conflicts:
+        print(f"  ⚠️  '{a1.title}' ({n1}) and '{a2.title}' ({n2}) both at {a1.time} on {a1.date}")
+else:
+    print("  ✅ No conflicts.")
 
-# Sorting all appointments by time
-print("\n--- All Appointments Sorted by Time ---")
-for patient_name, appt in caretaker.sort_by_time():
-    print(f"  {patient_name}: {appt}")
+# --- Sort by priority (tabulate) ---
+print("\n=== Sorted by Priority ===")
+by_priority = caretaker.sort_by_priority()
+priority_table = [
+    [appt.priority_emoji, appt.priority, appt.time, pet, appt.title, f"{appt.duration_minutes} min"]
+    for pet, appt in by_priority
+]
+print(tabulate(priority_table,
+               headers=["", "Priority", "Time", "Pet", "Task", "Duration"],
+               tablefmt="rounded_outline"))
 
-# Sort by priority
-print("\n--- All Appointments Sorted by Priority ---")
-for patient_name, appt in caretaker.sort_by_priority():
-    print(f"  {patient_name}: {appt}")
+# --- What fits in 60 minutes ---
+print("\n=== What Fits in 60 Minutes ===")
+fits = caretaker.what_fits(60, today)
+fits_table = [
+    [appt.emoji, appt.time, pet, appt.title, f"{appt.duration_minutes} min", appt.priority]
+    for pet, appt in fits
+]
+print(tabulate(fits_table,
+               headers=["", "Time", "Pet", "Task", "Duration", "Priority"],
+               tablefmt="rounded_outline"))
 
-# What fits in 60 minutes today
-print("\n--- What Fits in 60 Minutes Today ---")
-for patient_name, appt in caretaker.what_fits(60, today):
-    print(f"  {patient_name}: {appt}")
+# --- Challenge 1: Next Available Slot ---
+print("\n=== Next Available Slot ===")
+for duration in [15, 30, 60]:
+    slot = caretaker.find_next_slot(duration, today)
+    print(f"  Next available {duration}-min slot: {slot}")
 
-# Explain the plan
+# --- Explain plan ---
 print("\n" + caretaker.explain_plan(60, today))
 
-# Recurring task — mark complete and get next occurrence
-print("\n--- Recurring Task Demo ---")
+# --- Recurring task demo ---
+print("\n=== Recurring Task Demo ===")
 morning_feeding = mochi.appointments[0]
 print(f"  Before: {morning_feeding}")
 morning_feeding.confirm()
@@ -68,3 +96,12 @@ next_appt = morning_feeding.next_occurrence()
 if next_appt:
     mochi.book_appointment(next_appt)
     print(f"  Marked complete. Next occurrence booked: {next_appt}")
+
+# --- Challenge 2: Save and reload ---
+print("\n=== Data Persistence Demo ===")
+owner.save_to_json("data.json")
+print("  Saved to data.json")
+reloaded = Person.load_from_json("data.json")
+print(f"  Reloaded: {reloaded}")
+print(f"  Pets: {[str(p) for p in reloaded.patients]}")
+print(f"  Total appointments: {sum(len(p.appointments) for p in reloaded.patients)}")

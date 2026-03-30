@@ -27,6 +27,17 @@ A busy pet owner needs help staying consistent with pet care. They want an assis
 - **Time budget filter** — enter your available minutes and the planner picks the highest-priority tasks that fit using a greedy algorithm
 - **Conflict detection** — automatically flags two appointments booked at the same date and time with a warning
 - **Explain my plan** — plain-English breakdown of every included and skipped task, and why
+- **Next available slot** *(Challenge 1)* — given a task duration, scans the day in 15-minute increments and returns the first time window with no overlapping appointments
+- **Data persistence** *(Challenge 2)* — all pets and appointments are saved to `data.json` after every change and reloaded automatically on next launch
+- **Priority color-coding** *(Challenge 3)* — 🔴 High / 🟡 Medium / 🟢 Low visual indicators throughout the UI and CLI tables
+- **Task type emojis** *(Challenge 4)* — 🦮 walks, 🍽️ feedings, 💊 medications, 🏥 vet visits, 🎾 play, and more, automatically assigned from the appointment title
+
+### How Agent Mode Was Used (Challenge 1)
+The `find_next_slot()` algorithm was designed using Agent Mode. The prompt given was:
+
+> "In `pawpal_system.py`, add a `find_next_slot(duration_minutes, target_date, start_hour)` method to `Caretaker` that scans the day in 15-minute increments and returns the first available time window that fits a task of the given duration without overlapping any existing appointment. Use proper overlap detection — not just start-time matching."
+
+Agent Mode identified that start-time-only matching (the naive approach) would miss cases where a new task starts *during* an existing one. It suggested interval overlap logic: two intervals `[s1, e1]` and `[s2, e2]` overlap when `s1 < e2 and s2 < e1`. This was incorporated directly into the implementation.
 
 ---
 
