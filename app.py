@@ -120,40 +120,57 @@ st.header("4. Today's Schedule")
 selected_date = st.date_input("View schedule for", value=date.today())
 date_str = selected_date.strftime("%Y-%m-%d")
 
+col_sort, col_budget = st.columns(2)
+with col_sort:
+    sort_mode = st.radio("Sort by", ["Time", "Priority"], horizontal=True)
+with col_budget:
+    use_budget = st.checkbox("Apply time budget")
+    time_budget = st.number_input("Available minutes", min_value=1, max_value=1440, value=120,
+                                   disabled=not use_budget)
+
 if st.button("Generate Schedule"):
-    day = caretaker.plan_day(date_str)
+    if use_budget:
+        day = caretaker.what_fits(int(time_budget), date_str)
+    else:
+        day = caretaker.plan_day(date_str)
+
+    if sort_mode == "Priority" and not use_budget:
+        rank = {"high": 0, "medium": 1, "low": 2}
+        day = sorted(day, key=lambda x: (rank.get(x[1].priority, 99), x[1].time))
 
     if not day:
         st.info(f"No appointments scheduled for {date_str}.")
     else:
-        # Build table data
         rows = []
         for patient_name, appt in day:
             rows.append({
-                "Time": appt.time,
-                "Pet": patient_name,
-                "Task": appt.title,
+                "Time":     appt.time,
+                "Pet":      patient_name,
+                "Task":     appt.title,
                 "Duration": f"{appt.duration_minutes} min",
                 "Priority": appt.priority,
-                "Repeat": appt.repeat,
-                "Status": "Done" if appt.attended else "Pending",
+                "Repeat":   appt.repeat,
+                "Status":   "✅ Done" if appt.attended else "⏳ Pending",
             })
         st.table(rows)
 
         # Conflict warnings
         conflicts = caretaker.find_conflicts()
-        day_conflicts = [
-            (a1, a2) for a1, a2 in conflicts
-            if a1[1].date == date_str
-        ]
+        day_conflicts = [(a1, a2) for a1, a2 in conflicts if a1[1].date == date_str]
         if day_conflicts:
             for (n1, a1), (n2, a2) in day_conflicts:
                 st.warning(
-                    f"Conflict: **{n1}** '{a1.title}' and **{n2}** '{a2.title}' "
+                    f"⚠️ Conflict: **{n1}** '{a1.title}' and **{n2}** '{a2.title}' "
                     f"are both scheduled at **{a1.time}**. Consider rescheduling one."
                 )
         else:
-            st.success("No conflicts detected for this day!")
+            st.success("✅ No conflicts detected for this day!")
+
+    # Explain plan
+    if use_budget:
+        with st.expander("Why was my schedule built this way?"):
+            explanation = caretaker.explain_plan(int(time_budget), date_str)
+            st.code(explanation, language=None)
 
 st.divider()
 
@@ -169,7 +186,8 @@ else:
     for i, (patient_name, appt) in enumerate(pending):
         col1, col2 = st.columns([4, 1])
         with col1:
-            st.write(f"**{patient_name}** — {appt.title} on {appt.date} at {appt.time}")
+            priority_color = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(appt.priority, "⚪")
+            st.write(f"{priority_color} **{patient_name}** — {appt.title} on {appt.date} at {appt.time} ({appt.duration_minutes} min)")
         with col2:
             if st.button("Done", key=f"done_{i}"):
                 appt.confirm()
