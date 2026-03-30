@@ -1,88 +1,183 @@
 import streamlit as st
+from datetime import date
+from pawpal_system import Person, Patient, Appointment, Caretaker
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
 st.title("🐾 PawPal+")
+st.caption("A smart pet care planner for busy pet parents.")
 
-st.markdown(
-    """
-Welcome to the PawPal+ starter app.
+# --- Session State Setup ---
+if "owner" not in st.session_state:
+    st.session_state.owner = None
+if "caretaker" not in st.session_state:
+    st.session_state.caretaker = None
 
-This file is intentionally thin. It gives you a working Streamlit app so you can start quickly,
-but **it does not implement the project logic**. Your job is to design the system and build it.
+# --- Step 1: Owner Setup ---
+st.header("1. Who are you?")
 
-Use this app as your interactive demo once your backend classes/functions exist.
-"""
-)
+with st.form("owner_form"):
+    col1, col2 = st.columns(2)
+    with col1:
+        first_name = st.text_input("First name", value="Jordan")
+    with col2:
+        last_name = st.text_input("Last name", value="Lee")
+    phone = st.text_input("Phone (optional)", value="")
+    email = st.text_input("Email (optional)", value="")
+    submitted = st.form_submit_button("Save Owner")
 
-with st.expander("Scenario", expanded=True):
-    st.markdown(
-        """
-**PawPal+** is a pet care planning assistant. It helps a pet owner plan care tasks
-for their pet(s) based on constraints like time, priority, and preferences.
-
-You will design and implement the scheduling logic and connect it to this Streamlit UI.
-"""
+if submitted:
+    st.session_state.owner = Person(
+        first_name=first_name,
+        last_name=last_name,
+        phone=phone,
+        email=email,
     )
+    st.session_state.caretaker = Caretaker(st.session_state.owner)
+    st.success(f"Welcome, {st.session_state.owner.full_name}!")
 
-with st.expander("What you need to build", expanded=True):
-    st.markdown(
-        """
-At minimum, your system should:
-- Represent pet care tasks (what needs to happen, how long it takes, priority)
-- Represent the pet and the owner (basic info and preferences)
-- Build a plan/schedule for a day that chooses and orders tasks based on constraints
-- Explain the plan (why each task was chosen and when it happens)
-"""
-    )
+if st.session_state.owner is None:
+    st.info("Fill in your name above to get started.")
+    st.stop()
+
+owner: Person = st.session_state.owner
+caretaker: Caretaker = st.session_state.caretaker
 
 st.divider()
 
-st.subheader("Quick Demo Inputs (UI only)")
-owner_name = st.text_input("Owner name", value="Jordan")
-pet_name = st.text_input("Pet name", value="Mochi")
-species = st.selectbox("Species", ["dog", "cat", "other"])
+# --- Step 2: Add a Patient (Pet) ---
+st.header("2. Register a Pet")
 
-st.markdown("### Tasks")
-st.caption("Add a few tasks. In your final version, these should feed into your scheduler.")
+with st.form("patient_form"):
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        pet_name = st.text_input("Pet name", value="Mochi")
+    with col2:
+        species = st.selectbox("Species", ["Cat", "Dog", "Rabbit", "Bird", "Other"])
+    with col3:
+        age = st.number_input("Age (years)", min_value=0, max_value=30, value=2)
+    medical_notes = st.text_area("Medical notes (optional)", value="")
+    add_pet = st.form_submit_button("Register Pet")
 
-if "tasks" not in st.session_state:
-    st.session_state.tasks = []
+if add_pet:
+    existing_names = [p.name for p in owner.patients]
+    if pet_name in existing_names:
+        st.warning(f"{pet_name} is already registered.")
+    else:
+        owner.register_patient(Patient(
+            name=pet_name,
+            species=species,
+            age=age,
+            medical_notes=medical_notes,
+        ))
+        st.success(f"{pet_name} the {species} has been registered!")
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    task_title = st.text_input("Task title", value="Morning walk")
-with col2:
-    duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
-with col3:
-    priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
+if owner.patients:
+    st.write("**Registered pets:**", ", ".join(str(p) for p in owner.patients))
 
-if st.button("Add task"):
-    st.session_state.tasks.append(
-        {"title": task_title, "duration_minutes": int(duration), "priority": priority}
-    )
+st.divider()
 
-if st.session_state.tasks:
-    st.write("Current tasks:")
-    st.table(st.session_state.tasks)
+# --- Step 3: Book an Appointment ---
+st.header("3. Book an Appointment")
+
+if not owner.patients:
+    st.info("Register at least one pet before booking appointments.")
 else:
-    st.info("No tasks yet. Add one above.")
+    with st.form("appointment_form"):
+        patient_name = st.selectbox("Pet", [p.name for p in owner.patients])
+        title = st.text_input("Appointment title", value="Morning Walk")
+        col1, col2 = st.columns(2)
+        with col1:
+            appt_date = st.date_input("Date", value=date.today())
+        with col2:
+            appt_time = st.time_input("Time")
+        col3, col4, col5 = st.columns(3)
+        with col3:
+            duration = st.number_input("Duration (minutes)", min_value=1, max_value=300, value=20)
+        with col4:
+            priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
+        with col5:
+            repeat = st.selectbox("Repeat", ["none", "daily", "weekly"])
+        book = st.form_submit_button("Book Appointment")
+
+    if book:
+        target = next(p for p in owner.patients if p.name == patient_name)
+        target.book_appointment(Appointment(
+            title=title,
+            date=appt_date.strftime("%Y-%m-%d"),
+            time=appt_time.strftime("%H:%M"),
+            duration_minutes=int(duration),
+            priority=priority,
+            repeat=repeat,
+        ))
+        st.success(f"Booked '{title}' for {patient_name} at {appt_time.strftime('%H:%M')}!")
 
 st.divider()
 
-st.subheader("Build Schedule")
-st.caption("This button should call your scheduling logic once you implement it.")
+# --- Step 4: Daily Schedule ---
+st.header("4. Today's Schedule")
 
-if st.button("Generate schedule"):
-    st.warning(
-        "Not implemented yet. Next step: create your scheduling logic (classes/functions) and call it here."
-    )
-    st.markdown(
-        """
-Suggested approach:
-1. Design your UML (draft).
-2. Create class stubs (no logic).
-3. Implement scheduling behavior.
-4. Connect your scheduler here and display results.
-"""
-    )
+selected_date = st.date_input("View schedule for", value=date.today())
+date_str = selected_date.strftime("%Y-%m-%d")
+
+if st.button("Generate Schedule"):
+    day = caretaker.plan_day(date_str)
+
+    if not day:
+        st.info(f"No appointments scheduled for {date_str}.")
+    else:
+        # Build table data
+        rows = []
+        for patient_name, appt in day:
+            rows.append({
+                "Time": appt.time,
+                "Pet": patient_name,
+                "Task": appt.title,
+                "Duration": f"{appt.duration_minutes} min",
+                "Priority": appt.priority,
+                "Repeat": appt.repeat,
+                "Status": "Done" if appt.attended else "Pending",
+            })
+        st.table(rows)
+
+        # Conflict warnings
+        conflicts = caretaker.find_conflicts()
+        day_conflicts = [
+            (a1, a2) for a1, a2 in conflicts
+            if a1[1].date == date_str
+        ]
+        if day_conflicts:
+            for (n1, a1), (n2, a2) in day_conflicts:
+                st.warning(
+                    f"Conflict: **{n1}** '{a1.title}' and **{n2}** '{a2.title}' "
+                    f"are both scheduled at **{a1.time}**. Consider rescheduling one."
+                )
+        else:
+            st.success("No conflicts detected for this day!")
+
+st.divider()
+
+# --- Step 5: Mark Appointments Done ---
+st.header("5. Mark Appointments as Done")
+
+all_appts = owner.get_appointments()
+pending = [(name, appt) for name, appt in all_appts if not appt.attended]
+
+if not pending:
+    st.info("No pending appointments.")
+else:
+    for i, (patient_name, appt) in enumerate(pending):
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.write(f"**{patient_name}** — {appt.title} on {appt.date} at {appt.time}")
+        with col2:
+            if st.button("Done", key=f"done_{i}"):
+                appt.confirm()
+                next_appt = appt.next_occurrence()
+                if next_appt:
+                    target = next(p for p in owner.patients if p.name == patient_name)
+                    target.book_appointment(next_appt)
+                    st.success(f"Done! Next '{appt.title}' booked for {next_appt.date}.")
+                else:
+                    st.success(f"'{appt.title}' marked as done.")
+                st.rerun()
