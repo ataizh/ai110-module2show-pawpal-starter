@@ -42,13 +42,13 @@ I kept it greedy on purpose though. For a pet care app, the person using it isn'
 
 I used AI pretty much the whole way through. In the design phase I used it to bounce ideas for class names and structure. Once I had the UML I used it to generate the skeleton code. For the Streamlit part I asked it how session_state works because I hadn't used it before. For the algorithms it helped me think through the greedy vs. optimal tradeoff. For testing it drafted most of the test functions.
 
-The prompts that actually worked were the specific ones. Like instead of "how do I connect my classes" I'd ask "given this Person and Patient structure, how should Caretaker get all appointments across all patients" — that kind of thing got useful answers way faster.
+The prompts that actually worked were the specific ones. Like instead of "how do I connect my classes" I'd ask "given this Owner and Pet structure, how should Scheduler get all tasks from all of the Owner's pets?" — that kind of thing got useful answers way faster.
 
 **b. Judgment and verification**
 
-The biggest thing I changed was the class names. AI kept suggesting Owner, Pet, Task, Scheduler which works but it's boring and doesn't really say anything. I pushed back and asked for something more human and relatable, and we landed on Person/Patient/Appointment/Caretaker. That wasn't AI's idea — I had to keep rejecting the suggestions until it went in a different direction. Once I set that framing though, it built on it well.
+One place I pushed back on AI was the Scheduler's conflict detection. The first version it generated only checked if two tasks had the exact same start time — it would miss cases where a new task starts in the middle of an existing one. I pointed that out and asked it to use proper interval overlap math instead (`s1 < e2 and s2 < e1`). The final version in `find_next_slot()` uses that logic correctly.
 
-I also didn't just paste in test code without reading it. A couple of the generated tests were testing the wrong thing or had fixtures set up in a way that would pass even if the logic was broken. I caught those by actually reading through what each assertion was checking.
+I also didn't just paste in test code without reading it. A couple of the generated tests were testing the wrong thing or had fixtures set up in a way that would pass even if the logic was broken. I caught those by actually reading through what each assertion was checking before keeping them.
 
 ---
 
@@ -56,11 +56,13 @@ I also didn't just paste in test code without reading it. A couple of the genera
 
 **a. What you tested**
 
-I ended up with 22 tests across all the main behaviors:
-- **Appointment lifecycle** — confirming, cancelling, rescheduling
+I ended up with 24 tests across all the main behaviors:
+- **Task lifecycle** — mark_complete, unmark, reschedule
 - **Recurrence** — daily and weekly both generate the right next date, and "none" returns nothing
-- **Patient management** — adding an appointment actually increases the count, history only shows attended ones
-- **Sorting** — by time comes back in order, by priority goes high to low
+- **Pet management** — adding a task increases the count, get_completed and get_pending filter correctly
+- **Owner** — add_pet increases count, get_all_tasks returns correct (pet_name, task) tuples
+- **Sorting** — by time comes back in chronological order, by priority goes high to low
+- **Filtering** — filter_tasks works by pet name and by status
 - **Conflicts** — same date and time gets flagged, different times don't
 - **what_fits** — never goes over budget, picks high priority first, returns empty if budget is 0
 - **explain_plan** — shows INCLUDED and SKIPPED labels, mentions conflicts when they exist
@@ -77,7 +79,7 @@ I'd say 4 out of 5. The core stuff works and I tested the main edge cases. What 
 
 **a. What went well**
 
-Writing all the logic in `main.py` first before touching the UI was probably the best decision I made. Every time I ran it in the terminal and it worked, I knew the class was actually doing what I thought it was. So when I wired it into Streamlit there were basically no surprises. The naming thing also helped a lot — calling it Patient instead of Pet made me think about it differently and the design got better because of it.
+Writing all the logic in `main.py` first before touching the UI was probably the best decision I made. Every time I ran it in the terminal and it worked, I knew the class was actually doing what I thought it was. So when I wired it into Streamlit there were basically no surprises. The CLI-first approach also made debugging way easier — if something was wrong I could isolate it in the terminal without having to mess with the UI at the same time.
 
 **b. What you would improve**
 
