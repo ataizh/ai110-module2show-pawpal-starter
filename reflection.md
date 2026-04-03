@@ -3,22 +3,17 @@
 ## 1. System Design
 
 ### Core User Actions
-1. **Add a pet** — enter your name and your pet's info to get started
-2. **Schedule tasks** — add things like walks, feedings, or vet visits with a time and priority
-3. **Generate a daily plan** — see everything sorted out for the day, with warnings if anything overlaps
+1. Add a pet with their info like name, species and age
+2. Schedule care tasks like walks, feedings, or vet visits
+3. See today's schedule sorted out and get warned if anything overlaps
 
 **a. Initial design**
 
-I went with the four required classes: Owner, Pet, Task, and Scheduler. Each one has a clear job.
-
-- **Owner** — holds the owner's personal info (name, phone, email) and keeps a list of their pets. Has `add_pet()` to register a new pet and `get_all_tasks()` to pull every task across all pets at once.
-- **Pet** — stores the pet's info (name, species, age, medical notes) and owns a list of tasks. Has `add_task()`, `get_tasks()`, `get_completed()`, and `get_pending()`.
-- **Task** — represents one care activity like a walk or medication dose. Has a title, date, time, duration, priority, frequency (none/daily/weekly), and completion status. Key methods are `mark_complete()`, `reschedule()`, and `next_occurrence()` for recurring tasks.
-- **Scheduler** — the brain of the system. Takes an Owner and can sort tasks by time or priority, filter by pet or status, detect scheduling conflicts, figure out what fits in a time budget, find the next open slot, and explain the plan in plain English.
+I used the four classes Owner, Pet, Task, and Scheduler. Owner holds the persons info and their list of pets. Pet has the pets details and stores all its tasks. Task is like one care event, it has a title, time, date, how long it takes, priority and if it repeats. Scheduler is the one that does all the smart stuff like sorting and finding conflicts.
 
 **b. Design changes**
 
-The Scheduler ended up bigger than I originally planned — it started with about four methods and ended up with nine. The two I didn't plan upfront were `what_fits()` and `explain_plan()`. I added those after realizing that just sorting tasks by time isn't actually that useful — a pet owner with limited time needs to know *what to actually do today*, not just see a full list. So `what_fits()` filters down to tasks that fit a time budget, and `explain_plan()` tells the owner exactly why each task was included or skipped.
+Scheduler ended up way bigger than I thought. I started with like 4 methods and ended up needing more. I added what_fits() and explain_plan() because I realized just showing a sorted list wasnt that helpful. If you only have an hour you need to know what to actually do, not see everything. So those two methods handle that — one picks what fits in your time, the other explains why stuff got skipped.
 
 ---
 
@@ -26,13 +21,11 @@ The Scheduler ended up bigger than I originally planned — it started with abou
 
 **a. Constraints and priorities**
 
-The two things the scheduler cares about are priority (high/medium/low) and how much time you have. I made priority the main thing because not all pet tasks are equal — giving your dog his medication is not the same as taking him to the park. Time budget is secondary because you can't just pile everything in. Those two together actually let the system make real decisions instead of just listing stuff.
+The scheduler looks at two things — priority level and how much time you have. I made priority the main one because some tasks genuinely cant be skipped like giving medication. Time is the second thing because you cant just schedule everything if you only have 30 minutes free.
 
 **b. Tradeoffs**
 
-The way `what_fits()` works is greedy — it goes through tasks from high to low priority and just adds each one if it fits. It never goes back and rearranges. That means sometimes it'll grab three short high-priority tasks and then skip a medium one even though dropping one small task would've made room for it.
-
-I kept it greedy on purpose though. For a pet care app, the person using it isn't a CS student — they just want to know what to do today. A greedy approach is easy to explain and easy to understand. And since `explain_plan()` shows exactly what got skipped and why, the user can just manually reschedule anything that got cut. A full knapsack solution would technically be more optimal but honestly it would've been overkill here.
+The what_fits() method is greedy, it just picks tasks from high to low priority and adds them if they fit, it never goes back. So sometimes it takes a few small high priority tasks and skips a medium one even though swapping one small one wouldve made room. I kept it that way on purpose because its easier to understand and the explain_plan() output already tells you what got skipped and why so you can fix it yourself. A smarter algorithm wouldve been too complicated for what this needs.
 
 ---
 
@@ -40,15 +33,13 @@ I kept it greedy on purpose though. For a pet care app, the person using it isn'
 
 **a. How you used AI**
 
-I used AI pretty much the whole way through. In the design phase I used it to bounce ideas for class names and structure. Once I had the UML I used it to generate the skeleton code. For the Streamlit part I asked it how session_state works because I hadn't used it before. For the algorithms it helped me think through the greedy vs. optimal tradeoff. For testing it drafted most of the test functions.
+I used Copilot through most of it. At the start I used it to help figure out what methods each class needed. When I got to Streamlit I asked how session_state works because I didnt know. For the algorithms I asked it to help write sort_by_time and detect_conflicts. For testing it helped me write most of the test functions.
 
-The prompts that actually worked were the specific ones. Like instead of "how do I connect my classes" I'd ask "given this Owner and Pet structure, how should Scheduler get all tasks from all of the Owner's pets?" — that kind of thing got useful answers way faster.
+The prompts that worked better were more specific. Like asking "how should Scheduler get all tasks from Owner's pets" got a way better answer than just asking how to connect classes.
 
 **b. Judgment and verification**
 
-One place I pushed back on AI was the Scheduler's conflict detection. The first version it generated only checked if two tasks had the exact same start time — it would miss cases where a new task starts in the middle of an existing one. I pointed that out and asked it to use proper interval overlap math instead (`s1 < e2 and s2 < e1`). The final version in `find_next_slot()` uses that logic correctly.
-
-I also didn't just paste in test code without reading it. A couple of the generated tests were testing the wrong thing or had fixtures set up in a way that would pass even if the logic was broken. I caught those by actually reading through what each assertion was checking before keeping them.
+When I asked it to write conflict detection the first version only checked if two tasks had the same start time exactly. That wouldnt catch cases where a task starts in the middle of another one. I told it that and it fixed it to use interval math instead. I also read through the test code it generated because a couple of them werent actually testing the right thing, they wouldve passed even with broken logic.
 
 ---
 
@@ -56,22 +47,22 @@ I also didn't just paste in test code without reading it. A couple of the genera
 
 **a. What you tested**
 
-I ended up with 24 tests across all the main behaviors:
-- **Task lifecycle** — mark_complete, unmark, reschedule
-- **Recurrence** — daily and weekly both generate the right next date, and "none" returns nothing
-- **Pet management** — adding a task increases the count, get_completed and get_pending filter correctly
-- **Owner** — add_pet increases count, get_all_tasks returns correct (pet_name, task) tuples
-- **Sorting** — by time comes back in chronological order, by priority goes high to low
-- **Filtering** — filter_tasks works by pet name and by status
-- **Conflicts** — same date and time gets flagged, different times don't
-- **what_fits** — never goes over budget, picks high priority first, returns empty if budget is 0
-- **explain_plan** — shows INCLUDED and SKIPPED labels, mentions conflicts when they exist
+I have 24 tests total covering:
+- Task lifecycle — mark_complete, unmark, reschedule
+- Recurrence — daily adds 1 day, weekly adds 7, none returns nothing
+- Pet — adding a task increases count, completed and pending filter right
+- Owner — add_pet works, get_all_tasks returns the right tuples
+- Sorting — time order and priority order both work
+- Filtering — by pet name and by status
+- Conflicts — same time gets flagged, different times dont
+- what_fits — stays under budget, prefers high priority
+- explain_plan — shows INCLUDED and SKIPPED correctly
 
-The reason I focused on those is because scheduling bugs don't throw errors — they just quietly give you the wrong answer. If a conflict doesn't get flagged or a task gets skipped silently, the app still runs fine but the user gets bad info.
+Scheduling bugs are tricky because they dont crash the app they just give wrong info, so I wanted tests that would actually catch that.
 
 **b. Confidence**
 
-I'd say 4 out of 5. The core stuff works and I tested the main edge cases. What I didn't test is overlapping durations — like if one appointment is 30 minutes starting at 7am and another starts at 7:15, those overlap but my conflict detection won't catch it since it only checks exact start times. That's the next thing I'd fix.
+4 out of 5. The main stuff all works. The thing I didnt test is when two tasks overlap in duration but not start time, like one starts at 7:00 for 30 min and another at 7:15. The conflict check misses that because it only compares start times. Thats what I'd fix next.
 
 ---
 
@@ -79,12 +70,12 @@ I'd say 4 out of 5. The core stuff works and I tested the main edge cases. What 
 
 **a. What went well**
 
-Writing all the logic in `main.py` first before touching the UI was probably the best decision I made. Every time I ran it in the terminal and it worked, I knew the class was actually doing what I thought it was. So when I wired it into Streamlit there were basically no surprises. The CLI-first approach also made debugging way easier — if something was wrong I could isolate it in the terminal without having to mess with the UI at the same time.
+Building everything in main.py first before touching the UI was really helpful. I could just run it in the terminal and see if the logic was right without dealing with Streamlit at the same time. When I finally connected it to the UI there were barely any issues.
 
 **b. What you would improve**
 
-The conflict detection is too basic right now. It only catches exact time matches, so two appointments that overlap by 15 minutes slip through. I'd want to redo that with actual start/end interval math. I'd also add a way to delete or edit appointments in the UI — right now you can add and mark done but you can't change something you already booked.
+The conflict detection like I said only catches exact time matches. Id redo it with proper interval math. Id also add a way to delete or edit tasks in the app, right now you can add and mark done but you cant change anything after booking it.
 
 **c. Key takeaway**
 
-AI is really good at filling in the blanks once you know what you're building, but it can't figure out what you're building for you. Every time I gave it a vague prompt I got something generic back. Every time I came in with a clear idea of what I wanted — even if I couldn't code it yet — it actually helped. The class naming thing is a good example. I had to know I didn't want the generic version before I could push back and get something better. So the main thing I learned is that having a real opinion about your design before you start prompting makes everything go faster and the output way better.
+AI is useful but it needs you to already have a direction. When I gave it vague questions I got generic answers. When I knew what I wanted and just needed help writing it, it actually worked well. The main thing I learned is you have to stay in charge of the design decisions, AI is good for the implementation parts but not for figuring out what you actually want to build.
