@@ -201,7 +201,7 @@ if st.button("Generate Schedule"):
                 "Task":     appt.title,
                 "Duration": f"{appt.duration_minutes} min",
                 "Priority": f"{appt.priority_emoji} {appt.priority}",
-                "Repeat":   appt.repeat,
+                "Repeat":   appt.frequency,
                 "Status":   "✅ Done" if appt.completed else "⏳ Pending",
             })
         st.table(rows)
