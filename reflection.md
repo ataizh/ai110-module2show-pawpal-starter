@@ -9,16 +9,16 @@
 
 **a. Initial design**
 
-I went with four classes. I didn't want to just do the obvious "Owner, Pet, Task, Scheduler" thing because it felt too generic, so I modeled them after how a real care situation works — like a doctor's office. So I ended up with Person (the owner), Patient (the pet), Appointment (the task), and Caretaker (the one managing everything).
+I went with the four required classes: Owner, Pet, Task, and Scheduler. Each one has a clear job.
 
-- **Person** — holds the owner's info and keeps track of all their pets
-- **Patient** — the pet, but treated like someone with a health record — has medical notes, upcoming appointments, visit history
-- **Appointment** — one care event, like a walk or medication. Has a time, date, how long it takes, priority, and whether it repeats
-- **Caretaker** — the part that actually thinks. It figures out what fits in the day, what conflicts, and how to explain the plan
+- **Owner** — holds the owner's personal info (name, phone, email) and keeps a list of their pets. Has `add_pet()` to register a new pet and `get_all_tasks()` to pull every task across all pets at once.
+- **Pet** — stores the pet's info (name, species, age, medical notes) and owns a list of tasks. Has `add_task()`, `get_tasks()`, `get_completed()`, and `get_pending()`.
+- **Task** — represents one care activity like a walk or medication dose. Has a title, date, time, duration, priority, frequency (none/daily/weekly), and completion status. Key methods are `mark_complete()`, `reschedule()`, and `next_occurrence()` for recurring tasks.
+- **Scheduler** — the brain of the system. Takes an Owner and can sort tasks by time or priority, filter by pet or status, detect scheduling conflicts, figure out what fits in a time budget, find the next open slot, and explain the plan in plain English.
 
 **b. Design changes**
 
-The Caretaker ended up way bigger than I planned. I originally had like four methods on it but ended up with eight. The two I didn't expect to add were `what_fits()` and `explain_plan()`. I realized halfway through that just sorting tasks by time isn't that helpful — what a pet owner actually needs to know is "I only have an hour today, what should I actually do?" So I built those two methods around that idea. `explain_plan()` was specifically so the app could tell you *why* something got skipped, not just that it did.
+The Scheduler ended up bigger than I originally planned — it started with about four methods and ended up with nine. The two I didn't plan upfront were `what_fits()` and `explain_plan()`. I added those after realizing that just sorting tasks by time isn't actually that useful — a pet owner with limited time needs to know *what to actually do today*, not just see a full list. So `what_fits()` filters down to tasks that fit a time budget, and `explain_plan()` tells the owner exactly why each task was included or skipped.
 
 ---
 

@@ -35,7 +35,7 @@ A busy pet owner wants to stay on top of their pet's care without having to ment
 ### How Agent Mode Was Used (Challenge 1)
 I used Agent Mode to build `find_next_slot()`. My prompt was something like:
 
-> "Add a `find_next_slot(duration_minutes, target_date, start_hour)` method to Caretaker that scans the day in 15-minute increments and finds the first open time slot for a task of that length, without overlapping anything already booked."
+> "Add a `find_next_slot(duration_minutes, target_date, start_hour)` method to Scheduler that scans the day in 15-minute increments and finds the first open time slot for a task of that length, without overlapping anything already booked."
 
 The first version it came back with only checked if start times matched, which would've missed cases where a new appointment starts in the middle of an existing one. I pointed that out and it rewrote it with proper interval overlap logic — if two intervals `[s1, e1]` and `[s2, e2]` overlap when `s1 < e2 and s2 < e1`. That version actually works correctly so I kept it.
 
@@ -44,9 +44,9 @@ The first version it came back with only checked if start times matched, which w
 ## System Architecture
 
 ```
-Person  ──owns──►  Patient  ──has──►  Appointment
+Owner  ──owns──►  Pet  ──has──►  Task
                                           ▲
-Caretaker  ──manages──►  Person           │
+Scheduler  ──manages──►  Owner           │
   • plan_day()                            │
   • sort_by_time()          next_occurrence() (recurring)
   • sort_by_priority()
@@ -59,10 +59,10 @@ Caretaker  ──manages──►  Person           │
 
 | Class | Role |
 |---|---|
-| `Person` | The pet owner — name, contact info, list of patients |
-| `Patient` | A pet treated as a care patient — health record, appointment list |
-| `Appointment` | A single care event — time, duration, priority, recurrence |
-| `Caretaker` | The scheduling brain — sorts, filters, detects conflicts, explains plans |
+| `Owner` | The pet owner — name, contact info, list of pets |
+| `Pet` | Stores pet info and a list of care tasks |
+| `Task` | A single care activity — time, duration, priority, frequency |
+| `Scheduler` | The brain — sorts, filters, detects conflicts, explains plans |
 
 ---
 
@@ -87,9 +87,9 @@ The test suite covers 22 behaviors across 7 categories:
 
 | Category | What's tested |
 |---|---|
-| Appointment lifecycle | confirm, cancel, reschedule |
+| Task lifecycle | mark_complete, unmark, reschedule |
 | Recurrence | daily (+1 day), weekly (+7 days), none |
-| Patient management | booking count, history, upcoming |
+| Pet management | task count, completed, pending |
 | Sorting | by time (chronological), by priority (high→low) |
 | Conflict detection | same time flagged, different times pass |
 | what_fits | budget cap, priority preference, zero budget |
@@ -109,56 +109,60 @@ The test suite covers 22 behaviors across 7 categories:
 
 ```mermaid
 classDiagram
-    class Person {
+    class Owner {
         +str first_name
         +str last_name
         +str phone
         +str email
-        +list patients
-        +register_patient(patient)
-        +get_appointments()
-        +full_name property
+        +list pets
+        +add_pet(pet)
+        +get_all_tasks()
+        +full_name
+        +save_to_json()
+        +load_from_json()
     }
 
-    class Patient {
+    class Pet {
         +str name
         +str species
         +int age
         +str medical_notes
-        +list appointments
-        +book_appointment(appointment)
-        +get_history()
-        +get_upcoming()
+        +list tasks
+        +add_task(task)
+        +get_tasks()
+        +get_completed()
+        +get_pending()
     }
 
-    class Appointment {
+    class Task {
         +str title
         +str date
         +str time
         +int duration_minutes
         +str priority
-        +str repeat
-        +bool attended
-        +confirm()
-        +cancel()
+        +str frequency
+        +bool completed
+        +mark_complete()
+        +unmark()
         +reschedule(date, time)
         +next_occurrence()
     }
 
-    class Caretaker {
-        +Person person
+    class Scheduler {
+        +Owner owner
         +list schedule
         +plan_day(date)
         +sort_by_time()
         +sort_by_priority()
+        +filter_tasks(pet, status)
+        +detect_conflicts()
         +what_fits(budget, date)
-        +find_conflicts()
+        +find_next_slot(duration, date)
         +explain_plan(budget, date)
         +summarize_day(date)
-        +filter_by_priority(priority)
     }
 
-    Person "1" --> "many" Patient : responsible for
-    Patient "1" --> "many" Appointment : has
-    Caretaker "1" --> "1" Person : serves
+    Owner "1" --> "many" Pet : owns
+    Pet "1" --> "many" Task : has
+    Scheduler "1" --> "1" Owner : manages
 ```
